@@ -1,0 +1,38 @@
+default_profile: "C0_non_ascii_replace"
+gui_replacement_profile: "gui_replacement"
+
+filters:
+  "C0":
+    ranges:
+      - start: 0
+        end: 7
+      - single: 8
+      - single: 11
+      - single: 12
+      - start: 14
+        end: 0x1f
+      - single: 0x7f
+
+profiles:
+  - name: "identity"
+    display_name: "Don't replace anything"
+    transformations: []
+  - name: "C0_non_ascii_replace"
+    display_name: "Replace control- and non-ASCII characters"
+    transformations:
+      - filters:
+          - ref: "C0"
+          - filter:
+              ranges:
+                - start: 0x80
+                  end: 0xff
+        action:
+          replace: "\uFFFD"
+  - name: "gui_replacement"
+    display_name: "GUI textbox replacement profile"
+    description: "Replaces all non-printable control-characters with the unicode replacement character \uFFFD."
+    transformations:
+      - filters:
+          - ref: "C0"
+        action:
+          replace: "\uFFFD"
