@@ -5,21 +5,24 @@ use std::str::FromStr;
 use std::sync::Arc;
 use encoding::all::{ASCII, ISO_8859_1, ISO_8859_15, UTF_16BE, UTF_16LE, UTF_8};
 use encoding::{DecoderTrap, Encoding};
+use gdk::prelude::WindowExtManual;
 use glib::ObjectExt;
 use glib::signal::Inhibit;
 use gtk::{Application, ApplicationWindow, Clipboard, ComboBox, TextView};
-use gtk::prelude::{BuilderExt, BuilderExtManual, ButtonExt, GtkWindowExt, LabelExt, TextBufferExt, TextViewExt, TreeModelExt, TreeSelectionExt, WidgetExt};
+use gtk::prelude::{ApplicationWindowExt, BuilderExt, BuilderExtManual, ButtonExt, GtkWindowExt, LabelExt, TextBufferExt, TextViewExt, TreeModelExt, TreeSelectionExt, WidgetExt};
 use parking_lot::{RwLock};
 use crate::content_textbox::ContentTextbox;
 use crate::{ Config, DEFAULT_SELECTION };
 use crate::encoding_dropdown::EncodingDropdown;
 use crate::profile_dropdown::ProfileDropdown;
 use crate::targets_list::TargetsList;
+use crate::text_transformation::TextTransformation;
 
 pub struct MainWindow {
     app: Arc<Application>,
     window: Arc<ApplicationWindow>,
     config: Arc<Config>,
+    gui_replacement_profile: Option<TextTransformation>,
 
     on_delete_handler: RwLock<Cell<Box<dyn Fn(&MainWindow) -> () + 'static>>>,
 
@@ -69,10 +72,17 @@ impl MainWindow {
         let profiles_dropdown = Arc::new(profiles_dropdown);
         let profiles_dropdown = ProfileDropdown::new(app.clone(), profiles_dropdown.clone(), config.clone())?;
 
+        let gui_replacement_profile = if let Some(gui_replacement_profile) = config.gui_replacement_profile() {
+            Some(TextTransformation::new(&*config, &gui_replacement_profile)?)
+        } else {
+            None
+        };
+
         let result = Arc::new(MainWindow {
             app: app.clone(),
             window: Arc::new(window),
             config: config.clone(),
+            gui_replacement_profile,
             on_delete_handler: RwLock::new(Cell::new(Box::new(|_| {()}))),
             current_target: RwLock::new(String::new()),
             current_data: RwLock::new(Vec::new()),
@@ -83,6 +93,15 @@ impl MainWindow {
             println!("deleted!");
             let result_clone = result_clone.clone();
             result_clone.fire_delete();
+            return Inhibit(false);
+        });
+
+        let result_clone = result.clone();
+        result.window.connect_key_press_event(move |widget, key| {
+            let result_clone = result_clone.clone();
+            if key.keyval() == gdk::keys::constants::Escape {
+                result_clone.window.close();
+            }
             return Inhibit(false);
         });
 
@@ -124,19 +143,26 @@ impl MainWindow {
             let info_label_clone = info_label_clone.clone();
             let text = convert_to_encoding(encoding.clone(), &result_clone.data());
             if let Some(text) = text {
-                if contains_control_chars(text.as_str()) {
-                    info_label_clone.set_text("Control characters have been replaced with \u{fffd}.");
-                    let filtered_text = text.to_string().chars()
+                println!("original text: {}", text.as_str());
+                let filtered_text = if let Some(gui_replacement_profile) = result_clone.gui_replacement_profile.clone() {
+                    println!("using gui replacement profile: {:?}", &gui_replacement_profile);
+                    gui_replacement_profile.execute(text.as_str())
+                } else {
+                    println!("using default gui replacement function.");
+                    text.to_string().chars()
                         .map(|ch| if ch < '\u{0020}' && ch != '\t' && ch != '\n' && ch != '\r' {
                             '\u{fffd}'
                         } else {
                             ch
-                        }).collect::<String>();
-                    textbox_clone.buffer().unwrap().set_text(filtered_text.as_str());
+                        }).collect::<String>()
+                };
+                println!("filtered text: {}", filtered_text.as_str());
+                if text.as_str() != filtered_text.as_str() {
+                    info_label_clone.set_text("Clipboard text has been filtered to be viewable.");
                 } else {
                     info_label_clone.set_text("");
-                    textbox_clone.buffer().unwrap().set_text(text.as_str());
                 }
+                textbox_clone.buffer().unwrap().set_text(filtered_text.as_str());
             } else {
                 info_label_clone.set_text(format!("Could not convert data to {:?}", &encoding).as_str());
                 textbox_clone.buffer().unwrap().set_text("");

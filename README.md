@@ -30,3 +30,15 @@ or `toml`) and can be set at multiple locations:
      the `directories` crate with qualifier `net.laerrus`, company `Laerrus Ultd.` and 
      application name `clipboard-cleaner`. In a typical Linux system with XDG support, the config file
      would be in the directory `~/.config/clipboard-cleaner`.
+
+## Usage
+
+Just start the executable. There are no commandline-arguments. You can exit the application easily
+via pressing `ESC`. No other keyboard shortcuts are supported yet.
+
+## Build
+
+The project was developed with Rust version 1.60.0, but will probably work with other versions too.
+To build the project, either use `cargo build` or `cargo build --release`. There are custom release
+settings configured in `Cargo.toml` to reduce the executable size (currently to less than 1MB on
+x86_64) since this project is supposed to be repeatedly started by a keyboard shortcut.

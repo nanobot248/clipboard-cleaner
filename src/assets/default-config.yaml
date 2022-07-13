@@ -34,5 +34,10 @@ profiles:
     transformations:
       - filters:
           - ref: "C0"
+          - filter:
+              ranges:
+                - single: 0x41
+                - single: 0x61
         action:
-          replace: "\uFFFD"
+          replace: "?"
+          # replace: "\uFFFD"

@@ -32,3 +32,8 @@ itertools = "0.10.3"
 [dependencies.x11-dl]
 version = "2.19.1"
 optional = true
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
